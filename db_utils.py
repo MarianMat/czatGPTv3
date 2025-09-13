@@ -1,51 +1,39 @@
 import sqlite3
-from pathlib import Path
 
-DB_FILE = Path("conversations.db")
+DB_NAME = "conversations.db"
 
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS conversations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        personality TEXT,
-        model TEXT,
-        memory_mode TEXT,
-        session_cost_usd REAL DEFAULT 0,
-        language TEXT,
-        first_prompt TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        conversation_id INTEGER,
-        role TEXT,
-        content TEXT,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(conversation_id) REFERENCES conversations(id)
-    )
-    """)
+    c.execute("""CREATE TABLE IF NOT EXISTS conversations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT,
+                    personality TEXT,
+                    model TEXT,
+                    memory_mode TEXT,
+                    language TEXT
+                )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    conversation_id INTEGER,
+                    role TEXT,
+                    content TEXT
+                )""")
     conn.commit()
     conn.close()
 
 def create_conversation(name, personality, model, memory_mode, language):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute("""
-        INSERT INTO conversations (name, personality, model, memory_mode, language)
-        VALUES (?, ?, ?, ?, ?)
-    """, (name, personality, model, memory_mode, language))
-    conn.commit()
+    c.execute("INSERT INTO conversations (name, personality, model, memory_mode, language) VALUES (?, ?, ?, ?, ?)",
+              (name, personality, model, memory_mode, language))
     convo_id = c.lastrowid
+    conn.commit()
     conn.close()
     return convo_id
 
 def list_conversations():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("SELECT id, name FROM conversations ORDER BY id DESC")
     rows = c.fetchall()
@@ -53,7 +41,7 @@ def list_conversations():
     return rows
 
 def get_conversation(convo_id):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("SELECT * FROM conversations WHERE id=?", (convo_id,))
     row = c.fetchone()
@@ -61,20 +49,17 @@ def get_conversation(convo_id):
     return row
 
 def save_message(convo_id, role, content):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)",
               (convo_id, role, content))
     conn.commit()
     conn.close()
 
-def get_messages(convo_id, limit=None):
-    conn = sqlite3.connect(DB_FILE)
+def get_messages(convo_id):
+    conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    query = "SELECT role, content FROM messages WHERE conversation_id=? ORDER BY timestamp"
-    if limit:
-        query += f" LIMIT {limit}"
-    c.execute(query, (convo_id,))
-    rows = c.fetchall()
+    c.execute("SELECT role, content FROM messages WHERE conversation_id=?", (convo_id,))
+    rows = [{"role": r[0], "content": r[1]} for r in c.fetchall()]
     conn.close()
-    return [{"role": r, "content": c} for r, c in rows]
+    return rows
