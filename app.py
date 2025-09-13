@@ -7,16 +7,14 @@ from datetime import datetime
 # --- Inicjalizacja ---
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 qdrant_client = init_qdrant()
-init_db()  # upewniamy się, że baza SQLite istnieje
+init_db()
 
-# Modele i ceny
 model_pricings = {
     "gpt-4o": {"Opis": "Multimodalny – tekst, obraz, głos", "Input": 2.5, "Output": 10.0},
     "gpt-4o-mini": {"Opis": "Lekki i tani do chatbotów", "Input": 0.15, "Output": 0.6},
     "gpt-4-turbo": {"Opis": "Szybki tekstowy model", "Input": 1.5, "Output": 6.0},
     "gpt-3.5-turbo": {"Opis": "Budżetowa opcja", "Input": 0.5, "Output": 1.5}
 }
-USD_TO_PLN = 3.97
 
 translations = {
     "Polski": {
@@ -30,15 +28,10 @@ translations = {
         "model_select": "🤖 Wybierz model GPT",
         "personality": "🎭 Styl GPT",
         "memory_mode": "🧠 Tryb pamięci",
-        "export_button": "📤 Eksportuj rozmowę",
-        "download_txt": "⬇️ Pobierz jako TXT",
-        "cost_usd": "💰 Koszt (USD)",
-        "cost_pln": "💰 Koszt (PLN)",
         "default_personality": "Jesteś ekspertem AI, który pomaga tworzyć projekty w Pythonie z wykorzystaniem API OpenAI."
     }
 }
 
-# --- Funkcja generowania odpowiedzi ---
 def get_reply(prompt: str, memory: list, model: str, personality: str) -> dict:
     msgs = [{"role": "system", "content": personality}] + memory + [{"role": "user", "content": prompt}]
     resp = client.chat.completions.create(model=model, messages=msgs)
@@ -53,7 +46,6 @@ def get_reply(prompt: str, memory: list, model: str, personality: str) -> dict:
         }
     }
 
-# --- Konfiguracja Streamlit ---
 st.set_page_config(page_title="MójGPT", layout="centered")
 
 # --- Stan aplikacji ---
@@ -70,12 +62,8 @@ if "conversation_id" not in st.session_state:
     st.session_state.chatbot_personality = translations["Polski"]["default_personality"]
     st.session_state.memory_mode = "Pełna historia"
 
-# --- Wybór języka ---
-lang = st.sidebar.selectbox(
-    translations["Polski"]["language_switch"],
-    ["Polski"],
-    index=0
-)
+# --- Sidebar: język ---
+lang = st.sidebar.selectbox(translations["Polski"]["language_switch"], ["Polski"], index=0)
 t = translations[lang]
 
 # --- Sidebar: Nowa rozmowa ---
@@ -140,7 +128,6 @@ if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Dobór pamięci
     if st.session_state.memory_mode == "Ostatnie 10 wiadomości":
         memory = messages[-10:]
     elif st.session_state.memory_mode == "Rozszerzona (30)":
@@ -153,5 +140,4 @@ if prompt:
     with st.chat_message("assistant"):
         st.markdown(reply["content"])
 
-    # Zapis do Qdrant
     save_to_qdrant(prompt, reply["content"], f"Conv{st.session_state['conversation_id']}", qdrant_client)
